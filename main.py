@@ -8,13 +8,15 @@ from src.vision.camera import Camera
 from src.ui.overlay import draw_crosshair, draw_tracking_overlay
 from src.vision.tracker import make_tracker
 
+
+
 # -----------------------------
 # Servo import (safe / optional)
 # -----------------------------
 PanTiltController = None
 if config.USE_SERVO:
     try:
-        from servo.controller import PanTiltController
+        from src.servo.controller import PanTiltController
     except Exception:
         PanTiltController = None
 
