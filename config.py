@@ -2,7 +2,8 @@
 import numpy as np
 
 # Camera Size
-PREVIEW_SIZE = (640, 480)
+PREVIEW_SIZE = (960, 540)
+
 
 # Change the colour that you want to track
 # NOTE: Red wraps around hue=0, so we include both red bands for stability.
