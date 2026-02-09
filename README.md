@@ -83,6 +83,8 @@ This project is intentionally extensible. Possible next steps include:
 - ROS2 integration
 - Hardware acceleration for vision processing
 
+https://ibrahimmansur4.medium.com integrating-opencv-with-ros2-a-comprehensive-guide-to-computer-vision-in-robotics-66b97fa2de92
+
 ---
 
 ## Repo Guide
