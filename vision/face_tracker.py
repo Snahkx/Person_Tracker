@@ -6,15 +6,19 @@ class FaceTracker:
     def __init__(self):
         self.deadband_px = config.DEADBAND_PX
 
-        # Use OpenCV's built-in Haar cascade automatically.
-        # This avoids hardcoded /usr/share/... paths that often don't exist.
+        # Downscale factor for detection speed
+        self.detect_scale = float(getattr(config, "FACE_DETECT_SCALE", 0.5))
+
+        # Smoothing factor for face center stability
+        self.alpha = float(getattr(config, "FACE_CENTER_ALPHA", 0.25))
+        self._smoothed_center = None
+
+        # Cascade path
         cascade_path = getattr(config, "FACE_CASCADE_PATH", None)
         if not cascade_path:
             cascade_path = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
 
         self.face_cascade = cv.CascadeClassifier(cascade_path)
-
-        # If the cascade fails to load, give a useful message
         if self.face_cascade.empty():
             raise RuntimeError(
                 f"Failed to load Haar face cascade.\n"
@@ -22,17 +26,20 @@ class FaceTracker:
                 f"Tip: install opencv-data or use cv.data.haarcascades."
             )
 
+    def _smooth_center(self, cx: int, cy: int):
+        if self._smoothed_center is None:
+            sx, sy = float(cx), float(cy)
+        else:
+            sx, sy = self._smoothed_center
+            sx = (1 - self.alpha) * sx + self.alpha * cx
+            sy = (1 - self.alpha) * sy + self.alpha * cy
+        self._smoothed_center = (sx, sy)
+        return int(sx), int(sy)
+
     def process(self, frame_bgr):
         H, W = frame_bgr.shape[:2]
 
         gray = cv.cvtColor(frame_bgr, cv.COLOR_BGR2GRAY)
-
-        faces = self.face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(30, 30),
-        )
 
         result = {
             "found": False,
@@ -44,14 +51,38 @@ class FaceTracker:
             "mask": None,
         }
 
+        # Downscale for faster detection
+        s = self.detect_scale
+        if 0 < s < 1.0:
+            small = cv.resize(gray, (0, 0), fx=s, fy=s)
+        else:
+            small = gray
+            s = 1.0
+
+        faces = self.face_cascade.detectMultiScale(
+            small,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(30, 30),
+        )
+
         if len(faces) == 0:
+            self._smoothed_center = None
             return result
 
-        # Choose largest detected face
+        # Largest face in small coords
         x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
 
-        cx = x + w // 2
-        cy = y + h // 2
+        # Scale back to full frame coords
+        x = int(x / s)
+        y = int(y / s)
+        w = int(w / s)
+        h = int(h / s)
+
+        raw_cx = x + w // 2
+        raw_cy = y + h // 2
+
+        cx, cy = self._smooth_center(raw_cx, raw_cy)
 
         error_x = cx - (W // 2)
         error_y = cy - (H // 2)
@@ -65,9 +96,8 @@ class FaceTracker:
             "found": True,
             "bbox": (int(x), int(y), int(w), int(h)),
             "center": (int(cx), int(cy)),
-            "raw_center": (int(cx), int(cy)),
+            "raw_center": (int(raw_cx), int(raw_cy)),
             "error": (int(error_x), int(error_y)),
             "area": int(w * h),
         })
-
         return result

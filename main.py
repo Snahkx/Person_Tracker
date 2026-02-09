@@ -25,7 +25,8 @@ calibrate_requested = False
 
 def on_mouse(event, x, y, flags, param):
     """
-    Mouse callback: request calibration on LEFT CLICK
+    Left click anywhere in the Video window to calibrate distance
+    using the CURRENT bbox width.
     """
     global calibrate_requested
     if event == cv.EVENT_LBUTTONDOWN:
@@ -35,18 +36,13 @@ def on_mouse(event, x, y, flags, param):
 def main():
     global calibrate_requested
 
-    # -----------------------------
-    # Init camera + distance
-    # -----------------------------
     camera = Camera()
     dist_est = DistanceEstimator()
 
-    # Tracker (colour only, via config / forced in tracker)
+    # Tracker selected by config (face for your main goal)
     tracker = make_tracker(config.TRACK_MODE)
 
-    # -----------------------------
     # Servo controller (optional)
-    # -----------------------------
     controller = None
     if config.USE_SERVO and PanTiltController is not None:
         try:
@@ -54,17 +50,12 @@ def main():
         except Exception:
             controller = None
 
-    # -----------------------------
-    # OpenCV window + mouse hook
-    # -----------------------------
+    # Window + mouse callback
     cv.namedWindow("Video")
     cv.setMouseCallback("Video", on_mouse)
 
     try:
         while True:
-            # -----------------------------
-            # Capture + track
-            # -----------------------------
             frame = camera.read()
             result = tracker.process(frame)
 
@@ -77,14 +68,14 @@ def main():
             if result.get("found") and isinstance(bbox, (tuple, list)) and len(bbox) == 4:
                 w = int(bbox[2])
 
-                # Handle mouse-triggered calibration
+                # Click-to-calibrate focal length
                 if calibrate_requested:
                     fp = dist_est.calibrate(w)
                     if fp is not None:
                         print(f"[CALIB] focal_px set to {fp:.2f}")
                     calibrate_requested = False
 
-                # Estimate distance (after calibration)
+                # Distance (only works after calibration OR if config.FOCAL_LENGTH_PX is set)
                 result["distance_cm"] = dist_est.estimate_cm(w)
 
             # -----------------------------
@@ -105,15 +96,17 @@ def main():
             # -----------------------------
             cv.imshow("Video", frame)
 
+            # Face/person trackers don't generate masks; colour tracker does.
             mask = result.get("mask")
             if mask is not None:
                 cv.imshow("Mask", mask)
 
-            # -----------------------------
-            # Required for UI events
-            # -----------------------------
+            # Keep UI responsive (mouse events need waitKey)
             if cv.waitKey(1) == 27:  # ESC to quit
                 break
+
+    except KeyboardInterrupt:
+        print("\n[INFO] Ctrl+C pressed, exiting...")
 
     finally:
         camera.close()
