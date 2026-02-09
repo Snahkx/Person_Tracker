@@ -122,7 +122,24 @@ This approach:
 
 ---
 
-## Data Flow Summary
+### Interface Contracts (What each layer guarantees)
+
+
+
+- Vision → Control:
+  - Provides `(dx, dy)` pixel error from frame center and a `valid` flag.
+  - Guarantees coordinates are in image space using the same frame resolution.
+
+- Control → Hardware:
+  - Provides bounded PWM pulse widths (µs) for pan and tilt channels.
+  - Guarantees safety limits are enforced before commanding servos.
+
+- Hardware → Vision:
+  - Motion changes camera orientation; vision loop compensates continuously.
+  - No direct feedback from servos is assumed (open-loop actuation).
+  
+  ---
+
 ## Architecture Diagram (End-to-End)
 
 ```text
@@ -187,19 +204,4 @@ This approach:
 
 
 
-```md
----
 
-### Interface Contracts (What each layer guarantees)
-
-- Vision → Control:
-  - Provides `(dx, dy)` pixel error from frame center and a `valid` flag.
-  - Guarantees coordinates are in image space using the same frame resolution.
-
-- Control → Hardware:
-  - Provides bounded PWM pulse widths (µs) for pan and tilt channels.
-  - Guarantees safety limits are enforced before commanding servos.
-
-- Hardware → Vision:
-  - Motion changes camera orientation; vision loop compensates continuously.
-  - No direct feedback from servos is assumed (open-loop actuation).
