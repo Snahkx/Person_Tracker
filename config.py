@@ -55,32 +55,24 @@ SERVO_KP_PAN = 0.35
 SERVO_KP_TILT = 0.35
 
 # Cap how much to change per update (microseconds)
-SERVO_MAX_STEP_US = 16  # changed
+SERVO_MAX_STEP_US = 16
 
 # Flip directions if camera is mirrored or not
 PAN_INVERT = False
 TILT_INVERT = True
 
 # Vision smoothing / cleanup
-# Defines the size of the kernel for cleaning up the mask
-# Larger kernel, more clean up -> Smaller kernel, less clean up
 MASK_KERNEL = (10, 10)
-OPEN_ITERS = 1   # Removes noise (1-2), erode -> dilate
-CLOSE_ITERS = 1  # Fills holes (1-2), dilate -> erode
-CENTER_SMOOTH_ALPHA = 1  # Controls the smoothing of the center
-ERROR_SMOOTH_ALPHA = 1   # Controls the smoothing of the error signal
+OPEN_ITERS = 1
+CLOSE_ITERS = 1
+CENTER_SMOOTH_ALPHA = 1
+ERROR_SMOOTH_ALPHA = 1
 
 # Distance calculations
-# For face mode: treat KNOWN_TARGET_WIDTH_CM as "typical face width" (rough),
-# OR calibrate with your own face at CALIB_DISTANCE_CM for consistent results.
-KNOWN_TARGET_WIDTH_CM = 16.0     # Typical face width ~14-16cm; tune for YOU
-CALIB_DISTANCE_CM = 50.0         # Calibration distance measurement (measure from lens!)
-FOCAL_LENGTH_PX = None           # Will be computed when you press "c"
+KNOWN_TARGET_WIDTH_CM = 16.0
+CALIB_DISTANCE_CM = 50.0
+FOCAL_LENGTH_PX = None  # computed when you press "c"
+DIST_SMOOTH_ALPHA = 0.25
 
-DIST_SMOOTH_ALPHA = 0.25         # 0.15-0.35 good range (higher = more responsive)
-
-# Face cascade path
-# IMPORTANT: We DON'T hardcode /usr/share/... because it varies.
-# FaceTracker will use cv.data.haarcascades automatically.
-# You can still override with a custom path if you want:
+# Face cascade path (optional override)
 # FACE_CASCADE_PATH = None
