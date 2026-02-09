@@ -1,4 +1,5 @@
 # main.py
+import time
 import cv2 as cv
 import config
 
@@ -48,51 +49,89 @@ def main():
         except Exception:
             controller = None
 
+    # OpenCV window + mouse callback
     cv.namedWindow("Video")
     cv.setMouseCallback("Video", on_mouse)
 
+    # FPS tracking
+    prev_time = time.time()
+    fps = 0.0
+    fps_smooth = 0.0
+    fps_alpha = 0.15  # lower = smoother display
+
     try:
         while True:
+            # ---- FPS timing start (frame-to-frame) ----
+            now = time.time()
+            dt = now - prev_time
+            prev_time = now
+            if dt > 0:
+                fps = 1.0 / dt
+                fps_smooth = (1 - fps_alpha) * fps_smooth + fps_alpha * fps if fps_smooth > 0 else fps
+
+            # ---- Capture + track ----
             frame = camera.read()
             result = tracker.process(frame)
 
-            # -----------------------------
-            # Distance estimation
-            # -----------------------------
+            # ---- Distance estimation ----
             result["distance_cm"] = None
             bbox = result.get("bbox")
 
             if result.get("found") and isinstance(bbox, (tuple, list)) and len(bbox) == 4:
                 w = int(bbox[2])
 
+                # Click-to-calibrate focal length
                 if calibrate_requested:
                     fp = dist_est.calibrate(w)
                     if fp is not None:
                         print(f"[CALIB] focal_px set to {fp:.2f}")
                     calibrate_requested = False
 
+                # Distance (works after calibration OR if config.FOCAL_LENGTH_PX is set)
                 result["distance_cm"] = dist_est.estimate_cm(w)
 
-            # -----------------------------
-            # Servo control
-            # -----------------------------
+            # ---- Servo control ----
             if controller is not None and result.get("found") and result.get("error"):
                 error_x, error_y = result["error"]
                 controller.update(error_x, error_y)
 
-            # -----------------------------
-            # Overlays + display
-            # -----------------------------
+            # ---- Overlays ----
             draw_crosshair(frame)
             draw_tracking_overlay(frame, result)
 
+            # FPS overlay (top-left)
+            cv.putText(
+                frame,
+                f"FPS: {fps_smooth:.1f}",
+                (10, 30),
+                cv.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (0, 255, 0),
+                2,
+            )
+
+            # Calibration hint
+            if dist_est.focal_px is None:
+                cv.putText(
+                    frame,
+                    "Left-click to CALIBRATE distance",
+                    (10, 60),
+                    cv.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 255, 0),
+                    2,
+                )
+
+            # ---- Display ----
             cv.imshow("Video", frame)
 
             mask = result.get("mask")
             if mask is not None:
                 cv.imshow("Mask", mask)
 
-            if cv.waitKey(1) == 27:  # ESC quits
+            # Keep UI responsive (mouse events need waitKey)
+            key = cv.waitKey(1) & 0xFF
+            if key == 27:  # ESC quits
                 break
 
     except KeyboardInterrupt:
