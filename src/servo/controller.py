@@ -2,7 +2,8 @@
 import time
 import pigpio
 import config
-from servo.servos import Servo
+from .servos import Servo
+
 
 
 def clamp(v, vmin, vmax):
