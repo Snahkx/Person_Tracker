@@ -39,10 +39,8 @@ def main():
     camera = Camera()
     dist_est = DistanceEstimator()
 
-    # Tracker selected by config (face for your main goal)
     tracker = make_tracker(config.TRACK_MODE)
 
-    # Servo controller (optional)
     controller = None
     if config.USE_SERVO and PanTiltController is not None:
         try:
@@ -50,7 +48,6 @@ def main():
         except Exception:
             controller = None
 
-    # Window + mouse callback
     cv.namedWindow("Video")
     cv.setMouseCallback("Video", on_mouse)
 
@@ -68,14 +65,12 @@ def main():
             if result.get("found") and isinstance(bbox, (tuple, list)) and len(bbox) == 4:
                 w = int(bbox[2])
 
-                # Click-to-calibrate focal length
                 if calibrate_requested:
                     fp = dist_est.calibrate(w)
                     if fp is not None:
                         print(f"[CALIB] focal_px set to {fp:.2f}")
                     calibrate_requested = False
 
-                # Distance (only works after calibration OR if config.FOCAL_LENGTH_PX is set)
                 result["distance_cm"] = dist_est.estimate_cm(w)
 
             # -----------------------------
@@ -86,23 +81,18 @@ def main():
                 controller.update(error_x, error_y)
 
             # -----------------------------
-            # Overlays
+            # Overlays + display
             # -----------------------------
             draw_crosshair(frame)
             draw_tracking_overlay(frame, result)
 
-            # -----------------------------
-            # Display
-            # -----------------------------
             cv.imshow("Video", frame)
 
-            # Face/person trackers don't generate masks; colour tracker does.
             mask = result.get("mask")
             if mask is not None:
                 cv.imshow("Mask", mask)
 
-            # Keep UI responsive (mouse events need waitKey)
-            if cv.waitKey(1) == 27:  # ESC to quit
+            if cv.waitKey(1) == 27:  # ESC quits
                 break
 
     except KeyboardInterrupt:
