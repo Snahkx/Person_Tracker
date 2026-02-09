@@ -1,6 +1,8 @@
 # vision/face_tracker.py
+import os
 import cv2 as cv
 import config
+
 
 class FaceTracker:
     def __init__(self):
@@ -13,18 +15,48 @@ class FaceTracker:
         self.alpha = float(getattr(config, "FACE_CENTER_ALPHA", 0.25))
         self._smoothed_center = None
 
-        # Cascade path
+        # ----------------------------
+        # Cascade path (NO cv.data usage)
+        # ----------------------------
         cascade_path = getattr(config, "FACE_CASCADE_PATH", None)
-        if not cascade_path:
-            cascade_path = cv.data.haarcascades + "haarcascade_frontalface_default.xml"
 
-        self.face_cascade = cv.CascadeClassifier(cascade_path)
+        if cascade_path and os.path.exists(cascade_path):
+            chosen = cascade_path
+        else:
+            candidates = [
+                "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml",
+                "/usr/share/opencv/haarcascades/haarcascade_frontalface_default.xml",
+                os.path.join(os.getcwd(), "haarcascade_frontalface_default.xml"),
+            ]
+            chosen = None
+            for p in candidates:
+                if os.path.exists(p):
+                    chosen = p
+                    break
+
+            if chosen is None:
+                raise RuntimeError(
+                    "Could not find Haar cascade file.\n"
+                    "Tried:\n"
+                    " - config.FACE_CASCADE_PATH (but it was missing/invalid)\n"
+                    " - /usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml\n"
+                    " - /usr/share/opencv/haarcascades/haarcascade_frontalface_default.xml\n"
+                    " - ./haarcascade_frontalface_default.xml\n\n"
+                    "Fix options:\n"
+                    "1) Install OpenCV haarcascades package (opencv-data) OR\n"
+                    "2) Put the xml in your project folder OR\n"
+                    "3) Set FACE_CASCADE_PATH in config.py to the correct file path."
+                )
+
+        self.face_cascade = cv.CascadeClassifier(chosen)
         if self.face_cascade.empty():
             raise RuntimeError(
                 f"Failed to load Haar face cascade.\n"
-                f"Tried path: {cascade_path}\n"
-                f"Tip: install opencv-data or use cv.data.haarcascades."
+                f"Tried path: {chosen}\n"
+                f"File exists but OpenCV couldn't load it (corrupt file or incompatible build)."
             )
+
+        print(f"[INFO] Face cascade loaded: {chosen}")
 
     def _smooth_center(self, cx: int, cy: int):
         if self._smoothed_center is None:
