@@ -57,3 +57,11 @@ dist/
 # *.jpg
 # *.png
 # *.mp4
+
+
+# ===============================
+# Local project-specific files
+# ===============================
+config_local.py
+debug
+debug.save
