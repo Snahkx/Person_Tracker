@@ -4,59 +4,53 @@ import cv2 as cv
 import config
 
 
+def _first_existing(paths):
+    for p in paths:
+        if p and os.path.exists(p):
+            return p
+    return None
+
+
 class FaceTracker:
     def __init__(self):
         self.deadband_px = config.DEADBAND_PX
-
-        # Downscale factor for detection speed
         self.detect_scale = float(getattr(config, "FACE_DETECT_SCALE", 0.5))
-
-        # Smoothing factor for face center stability
         self.alpha = float(getattr(config, "FACE_CENTER_ALPHA", 0.25))
         self._smoothed_center = None
 
-        # ----------------------------
-        # Cascade path (NO cv.data usage)
-        # ----------------------------
-        cascade_path = getattr(config, "FACE_CASCADE_PATH", None)
+        # --- Resolve cascade paths (no cv.data usage) ---
+        frontal_cfg = getattr(config, "FACE_CASCADE_FRONTAL", None)
+        profile_cfg = getattr(config, "FACE_CASCADE_PROFILE", None)
 
-        if cascade_path and os.path.exists(cascade_path):
-            chosen = cascade_path
-        else:
-            candidates = [
-                "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml",
-                "/usr/share/opencv/haarcascades/haarcascade_frontalface_default.xml",
-                os.path.join(os.getcwd(), "haarcascade_frontalface_default.xml"),
-            ]
-            chosen = None
-            for p in candidates:
-                if os.path.exists(p):
-                    chosen = p
-                    break
+        frontal_path = _first_existing([
+            frontal_cfg,
+            "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml",
+            "/usr/share/opencv/haarcascades/haarcascade_frontalface_default.xml",
+            os.path.join(os.getcwd(), "haarcascade_frontalface_default.xml"),
+        ])
 
-            if chosen is None:
-                raise RuntimeError(
-                    "Could not find Haar cascade file.\n"
-                    "Tried:\n"
-                    " - config.FACE_CASCADE_PATH (but it was missing/invalid)\n"
-                    " - /usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml\n"
-                    " - /usr/share/opencv/haarcascades/haarcascade_frontalface_default.xml\n"
-                    " - ./haarcascade_frontalface_default.xml\n\n"
-                    "Fix options:\n"
-                    "1) Install OpenCV haarcascades package (opencv-data) OR\n"
-                    "2) Put the xml in your project folder OR\n"
-                    "3) Set FACE_CASCADE_PATH in config.py to the correct file path."
-                )
+        profile_path = _first_existing([
+            profile_cfg,
+            "/usr/share/opencv4/haarcascades/haarcascade_profileface.xml",
+            "/usr/share/opencv/haarcascades/haarcascade_profileface.xml",
+            os.path.join(os.getcwd(), "haarcascade_profileface.xml"),
+        ])
 
-        self.face_cascade = cv.CascadeClassifier(chosen)
-        if self.face_cascade.empty():
-            raise RuntimeError(
-                f"Failed to load Haar face cascade.\n"
-                f"Tried path: {chosen}\n"
-                f"File exists but OpenCV couldn't load it (corrupt file or incompatible build)."
-            )
+        if frontal_path is None:
+            raise RuntimeError("Missing frontal cascade xml. Install opencv-data or set FACE_CASCADE_FRONTAL.")
+        if profile_path is None:
+            raise RuntimeError("Missing profile cascade xml. Install opencv-data or set FACE_CASCADE_PROFILE.")
 
-        print(f"[INFO] Face cascade loaded: {chosen}")
+        self.frontal = cv.CascadeClassifier(frontal_path)
+        self.profile = cv.CascadeClassifier(profile_path)
+
+        if self.frontal.empty():
+            raise RuntimeError(f"Failed to load frontal cascade: {frontal_path}")
+        if self.profile.empty():
+            raise RuntimeError(f"Failed to load profile cascade: {profile_path}")
+
+        print(f"[INFO] Frontal cascade: {frontal_path}")
+        print(f"[INFO] Profile cascade: {profile_path}")
 
     def _smooth_center(self, cx: int, cy: int):
         if self._smoothed_center is None:
@@ -68,9 +62,44 @@ class FaceTracker:
         self._smoothed_center = (sx, sy)
         return int(sx), int(sy)
 
+    def _detect(self, small_gray):
+        """
+        Returns list of (x,y,w,h) in small image coords from:
+        - frontal
+        - profile
+        - mirrored profile (to catch both left and right profiles)
+        """
+        detections = []
+
+        # Frontal
+        faces_f = self.frontal.detectMultiScale(
+            small_gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+        )
+        for (x, y, w, h) in faces_f:
+            detections.append((x, y, w, h))
+
+        # Profile (one direction)
+        faces_p = self.profile.detectMultiScale(
+            small_gray, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30)
+        )
+        for (x, y, w, h) in faces_p:
+            detections.append((x, y, w, h))
+
+        # Mirrored profile (other direction)
+        flipped = cv.flip(small_gray, 1)
+        faces_pf = self.profile.detectMultiScale(
+            flipped, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30)
+        )
+        W = small_gray.shape[1]
+        for (x, y, w, h) in faces_pf:
+            # map flipped coords back to original
+            x_unflip = W - (x + w)
+            detections.append((x_unflip, y, w, h))
+
+        return detections
+
     def process(self, frame_bgr):
         H, W = frame_bgr.shape[:2]
-
         gray = cv.cvtColor(frame_bgr, cv.COLOR_BGR2GRAY)
 
         result = {
@@ -83,7 +112,7 @@ class FaceTracker:
             "mask": None,
         }
 
-        # Downscale for faster detection
+        # Downscale for speed
         s = self.detect_scale
         if 0 < s < 1.0:
             small = cv.resize(gray, (0, 0), fx=s, fy=s)
@@ -91,21 +120,16 @@ class FaceTracker:
             small = gray
             s = 1.0
 
-        faces = self.face_cascade.detectMultiScale(
-            small,
-            scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(30, 30),
-        )
+        detections = self._detect(small)
 
-        if len(faces) == 0:
+        if not detections:
             self._smoothed_center = None
             return result
 
-        # Largest face in small coords
-        x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
+        # Choose largest detection
+        x, y, w, h = max(detections, key=lambda r: r[2] * r[3])
 
-        # Scale back to full frame coords
+        # Scale back to full-res coords
         x = int(x / s)
         y = int(y / s)
         w = int(w / s)

@@ -83,7 +83,10 @@ DIST_SMOOTH_ALPHA = 0.25
 FACE_DETECT_SCALE = 0.5    # 0.5 good; 0.4 faster
 FACE_CENTER_ALPHA = 0.25   # 0.15–0.35
 
-FACE_CASCADE_PATH = "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml"
+# FACE_CASCADE_PATH = "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml"
+FACE_CASCADE_FRONTAL = "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml"
+FACE_CASCADE_PROFILE = "/usr/share/opencv4/haarcascades/haarcascade_profileface.xml"
+
 
 # ==========================================================
 # Local overrides (NOT tracked by git)
