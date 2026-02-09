@@ -3,10 +3,10 @@ import time
 import cv2 as cv
 import config
 
-from distance.estimator import DistanceEstimator
-from vision.camera import Camera
-from ui.overlay import draw_crosshair, draw_tracking_overlay
-from vision.tracker import make_tracker
+from src.distance.estimator import DistanceEstimator
+from src.vision.camera import Camera
+from src.ui.overlay import draw_crosshair, draw_tracking_overlay
+from src.vision.tracker import make_tracker
 
 # -----------------------------
 # Servo import (safe / optional)
