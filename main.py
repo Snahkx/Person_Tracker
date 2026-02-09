@@ -14,11 +14,13 @@ if config.USE_SERVO:
     except Exception:
         PanTiltController = None
 
+
 def main():
     camera = Camera()
     dist_est = DistanceEstimator()
 
-    # Choose tracker from config (single mode)
+    # Tracker (we'll force colour inside vision/tracker.py if you changed it,
+    # otherwise set TRACK_MODE="colour" in config.py)
     tracker = make_tracker(config.TRACK_MODE)
 
     controller = None
@@ -31,7 +33,7 @@ def main():
     try:
         while True:
             frame = camera.read()
-            result = tracker.process(frame)  # must return dict
+            result = tracker.process(frame)  # dict
 
             # Distance from bbox width
             result["distance_cm"] = None
@@ -55,6 +57,7 @@ def main():
             if mask is not None:
                 cv.imshow("Mask", mask)
 
+            # --- Keys (ONLY calibration + quit) ---
             key = cv.waitKey(1) & 0xFF
 
             # Calibrate focal length using current bbox width
@@ -62,8 +65,11 @@ def main():
                 bbox = result.get("bbox")
                 if result.get("found") and isinstance(bbox, (tuple, list)) and len(bbox) == 4:
                     w = int(bbox[2])
-                    dist_est.calibrate(w)
+                    fp = dist_est.calibrate(w)
+                    if fp is not None:
+                        print(f"[CALIB] focal_px set to {fp:.2f}")
 
+            # Quit
             elif key == ord("q"):
                 break
 
@@ -74,5 +80,6 @@ def main():
         cv.destroyAllWindows()
 
 
-if __name__ == "__main__":
+#Checks if main is ran
+if __name__ == "__main__":   
     main()

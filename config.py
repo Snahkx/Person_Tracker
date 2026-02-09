@@ -27,7 +27,7 @@ DEADBAND_PX = 0   # The error from the crosshair to the centre of the object
 
 # Servo usage
 USE_SERVO = True
-TRACK_MODE = "face"  # "person" | "colour" | "face"
+TRACK_MODE = "colour"  # "person" | "colour" | "face"
 
 # Servo pins
 PAN_PIN = 18
@@ -83,4 +83,4 @@ DIST_SMOOTH_ALPHA = 0.25         # 0.15-0.35 good range (higher = more responsiv
 # IMPORTANT: We DON'T hardcode /usr/share/... because it varies.
 # FaceTracker will use cv.data.haarcascades automatically.
 # You can still override with a custom path if you want:
-FACE_CASCADE_PATH = None
+# FACE_CASCADE_PATH = None
