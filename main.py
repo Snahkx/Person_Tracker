@@ -59,23 +59,32 @@ def main():
     fps_smooth = 0.0
     fps_alpha = 0.15  # lower = smoother display
 
+    # Distance throttling (huge FPS win on Pi)
+    last_dist_t = 0.0
+    DIST_UPDATE_S = 0.10  # 10 Hz distance updates
+
     try:
         while True:
-            # ---- FPS timing start (frame-to-frame) ----
+            # ---- Capture + track ----
+            frame = camera.read()
+            result = tracker.process(frame)
+
+            # ---- FPS timing (frame-to-frame) ----
             now = time.time()
             dt = now - prev_time
             prev_time = now
             if dt > 0:
                 fps = 1.0 / dt
-                fps_smooth = (1 - fps_alpha) * fps_smooth + fps_alpha * fps if fps_smooth > 0 else fps
+                fps_smooth = (
+                    (1 - fps_alpha) * fps_smooth + fps_alpha * fps
+                    if fps_smooth > 0
+                    else fps
+                )
 
-            # ---- Capture + track ----
-            frame = camera.read()
-            result = tracker.process(frame)
-
-            # ---- Distance estimation ----
-            result["distance_cm"] = None
+            # ---- Distance estimation (throttled) ----
             bbox = result.get("bbox")
+            if "distance_cm" not in result:
+                result["distance_cm"] = None
 
             if result.get("found") and isinstance(bbox, (tuple, list)) and len(bbox) == 4:
                 w = int(bbox[2])
@@ -87,8 +96,12 @@ def main():
                         print(f"[CALIB] focal_px set to {fp:.2f}")
                     calibrate_requested = False
 
-                # Distance (works after calibration OR if config.FOCAL_LENGTH_PX is set)
-                result["distance_cm"] = dist_est.estimate_cm(w)
+                # Update distance only every DIST_UPDATE_S seconds (saves FPS)
+                if dist_est.focal_px is not None and (now - last_dist_t) >= DIST_UPDATE_S:
+                    result["distance_cm"] = dist_est.estimate_cm(w)
+                    last_dist_t = now
+            else:
+                result["distance_cm"] = None
 
             # ---- Servo control ----
             if controller is not None and result.get("found") and result.get("error"):
@@ -110,7 +123,7 @@ def main():
                 2,
             )
 
-            # Calibration hint
+            # Calibration hint (only when not calibrated)
             if dist_est.focal_px is None:
                 cv.putText(
                     frame,
@@ -125,9 +138,12 @@ def main():
             # ---- Display ----
             cv.imshow("Video", frame)
 
-            mask = result.get("mask")
-            if mask is not None:
-                cv.imshow("Mask", mask)
+            # IMPORTANT: showing Mask window costs FPS.
+            # Only show it for colour mode.
+            if config.TRACK_MODE == "colour":
+                mask = result.get("mask")
+                if mask is not None:
+                    cv.imshow("Mask", mask)
 
             # Keep UI responsive (mouse events need waitKey)
             key = cv.waitKey(1) & 0xFF

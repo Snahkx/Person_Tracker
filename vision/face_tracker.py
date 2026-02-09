@@ -73,14 +73,14 @@ class FaceTracker:
 
         # Frontal
         faces_f = self.frontal.detectMultiScale(
-            small_gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+            small_gray, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30)
         )
         for (x, y, w, h) in faces_f:
             detections.append((x, y, w, h))
 
         # Profile (one direction)
         faces_p = self.profile.detectMultiScale(
-            small_gray, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30)
+            small_gray, scaleFactor=1.1, minNeighbors=3, minSize=(30, 30)
         )
         for (x, y, w, h) in faces_p:
             detections.append((x, y, w, h))
@@ -88,7 +88,7 @@ class FaceTracker:
         # Mirrored profile (other direction)
         flipped = cv.flip(small_gray, 1)
         faces_pf = self.profile.detectMultiScale(
-            flipped, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30)
+            flipped, scaleFactor=1.1, minNeighbors=3, minSize=(30, 30)
         )
         W = small_gray.shape[1]
         for (x, y, w, h) in faces_pf:
@@ -101,6 +101,12 @@ class FaceTracker:
     def process(self, frame_bgr):
         H, W = frame_bgr.shape[:2]
         gray = cv.cvtColor(frame_bgr, cv.COLOR_BGR2GRAY)
+
+        # Improve robustness to lighting + profiles
+        clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        gray = clahe.apply(gray)
+        gray = cv.GaussianBlur(gray, (3, 3), 0)
+
 
         result = {
             "found": False,

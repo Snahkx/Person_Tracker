@@ -80,7 +80,7 @@ DIST_SMOOTH_ALPHA = 0.25
 # ----------------------------
 # Face tracking tuning
 # ----------------------------
-FACE_DETECT_SCALE = 0.5    # 0.5 good; 0.4 faster
+FACE_DETECT_SCALE = 0.4    # 0.5 good; 0.4 faster
 FACE_CENTER_ALPHA = 0.25   # 0.15–0.35
 
 # FACE_CASCADE_PATH = "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml"
