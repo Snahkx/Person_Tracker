@@ -123,80 +123,68 @@ This approach:
 ---
 
 ## Data Flow Summary
+## Architecture Diagram (End-to-End)
 
+```text
 ┌───────────────────────────────────────────────────────────────┐
 │                         Operator / User                        │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │  Live tracking session                                     │ │
-│  │  - Launches runtime (python main.py)                       │ │
-│  │  - Observes overlay + tuning feedback                      │ │
-│  └───────────────────────────────────────────────────────────┘ │
-└───────────────────────────────┬───────────────────────────────┘
-                                │
-                                │ Launch / Keyboard / Config
-                                ▼
+│  - Launches runtime (python main.py)                           │
+│  - Observes overlay + tuning feedback                          │
+└───────────────────────────────────────────────────────────────┘
+                          │  Launch / Config
+                          ▼
 ┌───────────────────────────────────────────────────────────────┐
-│                         Runtime: main.py                       │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │  Application Loop                                           │ │
-│  │  - Reads frames from Camera()                               │ │
-│  │  - Calls tracker.process(frame)                             │ │
-│  │  - Computes pixel error vs frame center                     │ │
-│  │  - Updates PanTiltController (if enabled)                   │ │
-│  │  - Draws overlay diagnostics                                │ │
-│  └───────────────────────────────────────────────────────────┘ │
-└───────────────────────────────┬───────────────────────────────┘
-                                │
-                                │ Frame (BGR) / Detection results
-                                ▼
+│                       Runtime: main.py                         │
+│  Application Loop:                                              │
+│  - frame = Camera.read()                                        │
+│  - result = tracker.process(frame)                              │
+│  - compute pixel error vs frame center                          │
+│  - update PanTiltController (if enabled)                        │
+│  - draw overlay diagnostics                                     │
+└───────────────────────────────────────────────────────────────┘
+                          │  Frame + detection results
+                          ▼
 ┌───────────────────────────────────────────────────────────────┐
-│                       Vision Subsystem (src/vision)            │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │  Camera                                                    │ │
-│  │  - Frame acquisition (Pi Camera / USB)                     │ │
-│  │  - Resolution + FPS tuning                                 │ │
-│  └───────────────────────────────────────────────────────────┘ │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │  Trackers (person / face / colour)                         │ │
-│  │  - Detection + bounding box extraction                      │ │
-│  │  - Target selection (single target)                        │ │
-│  │  - Outputs centroid (x, y), bbox, valid flag               │ │
-│  └───────────────────────────────────────────────────────────┘ │
-└───────────────────────────────┬───────────────────────────────┘
-                                │ Pixel error (dx, dy)
-                                ▼
+│                    Vision Subsystem (src/vision)               │
+│  Camera                                                        │
+│  - Pi Camera / USB capture                                     │
+│  - resolution + FPS tuning                                     │
+│                                                               │
+│  Trackers (person / face / colour)                              │
+│  - detection + bounding box extraction                          │
+│  - target selection (single target)                             │
+│  - outputs centroid (x,y), bbox, valid flag                     │
+└───────────────────────────────────────────────────────────────┘
+                          │  Pixel error (dx, dy)
+                          ▼
 ┌───────────────────────────────────────────────────────────────┐
-│                   Control Subsystem (src/servo)                │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │  PanTiltController                                         │ │
-│  │  - Deadband (jitter suppression near center)               │ │
-│  │  - Error → velocity/step mapping                           │ │
-│  │  - Rate limiting / smoothing for stability                 │ │
-│  │  - Enforces min/max pulse widths (safe bounds)             │ │
-│  └───────────────────────────────────────────────────────────┘ │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │  pigpio Interface                                          │ │
-│  │  - Connects to pigpio daemon                               │ │
-│  │  - Sends PWM pulse widths to GPIO pins                     │ │
-│  └───────────────────────────────────────────────────────────┘ │
-└───────────────────────────────┬───────────────────────────────┘
-                                │ PWM (pulse width in µs)
-                                ▼
+│                 Control Subsystem (src/servo)                  │
+│  PanTiltController                                              │
+│  - deadband (jitter suppression near center)                    │
+│  - error → step/velocity mapping                                │
+│  - rate limiting / smoothing for stability                      │
+│  - enforces min/max pulse widths (safe bounds)                  │
+│                                                               │
+│  pigpio Interface                                               │
+│  - connects to pigpio daemon                                    │
+│  - sends PWM pulse widths to GPIO pins                          │
+└───────────────────────────────────────────────────────────────┘
+                          │  PWM (pulse width in µs)
+                          ▼
 ┌───────────────────────────────────────────────────────────────┐
 │                        Hardware Platform                        │
-│  ┌───────────────────────┐     ┌─────────────────────────────┐ │
-│  │ Pan Servo (Yaw)       │     │ Tilt Servo (Pitch)          │ │
-│  │ - Horizontal rotation │     │ - Vertical rotation         │ │
-│  └───────────┬───────────┘     └──────────────┬──────────────┘ │
-│              │                                   │              │
-│              └───────────────┬───────────────────┘              │
-│                              ▼                                  │
-│                  Pan–Tilt Mechanical Assembly                    │
-│          (SolidWorks CAD + drawings in /hardware)               │
-│                              │                                  │
-│                              ▼                                  │
+│  Pan Servo (Yaw)                 Tilt Servo (Pitch)             │
+│  - horizontal rotation           - vertical rotation             │
+│             \                         /                          │
+│              \                       /                           │
+│               ▼                     ▼                            │
+│               Pan–Tilt Mechanical Assembly                       │
+│        (SolidWorks CAD + drawings in /hardware)                  │
+│                               │                                 │
+│                               ▼                                 │
 │                           Camera Mount                           │
 └───────────────────────────────────────────────────────────────┘
+
 
 ---
 

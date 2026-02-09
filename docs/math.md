@@ -1,158 +1,149 @@
-# Distance Estimation (Monocular) — Pinhole Model Notes
+# Distance Estimation (Monocular)
 
-This document explains how `distance.estimator.DistanceEstimator` estimates the target’s distance
-from a **single camera** using the **pinhole camera model**, plus the calibration and smoothing used
-to make it stable in real-time tracking.
-
----
-
-## Signal Processing Pipeline (Distance)
-
-**Goal:** estimate distance-to-target (cm) from a detected bounding box width (px).
+This document describes how `DistanceEstimator` estimates the distance between
+the camera and a tracked target using a **single monocular camera**. The approach
+uses a pinhole camera approximation, one-time calibration, and exponential
+smoothing for real-time stability.
 
 ---
 
-Camera Frame → Detection/Tracking → Bounding Box Width (px)
+## Signal Processing Pipeline
+
+Goal: estimate distance to target (cm) from a detected bounding box width (px).
+
+Camera Frame
 ↓
-Calibration (once)
+Target Detection / Tracking
 ↓
-Pinhole Distance Estimate (cm) → Smoothing → Display / Control
+Bounding Box Width (px)
+↓
+Pinhole Distance Model
+↓
+Exponential Smoothing
+↓
+Distance Estimate (cm)
 
----
-
-### Inputs
-- `bbox_width_px`: width of the detected bounding box in pixels (from vision tracker)
-- `KNOWN_TARGET_WIDTH_CM`: assumed real-world width of the target (defaults to `16.0 cm`)
-- `CALIB_DISTANCE_CM`: known distance used during calibration (defaults to `50.0 cm`)
-- `FOCAL_LENGTH_PX`: focal length in pixel units (either pre-set or computed via calibration)
-- `DIST_SMOOTH_ALPHA`: smoothing factor (defaults to `0.25`)
-
-### Output
-- Estimated distance in **cm** (smoothed), or `None` if not enough info is available.
 
 ---
 
 ## Core Model: Pinhole Camera Approximation
 
-We model the camera as a pinhole camera. For an object of known real width:
+The estimator assumes a pinhole camera model where the apparent width of an
+object in the image is inversely proportional to its distance from the camera.
 
-\[
-\text{distance}_{cm} = \frac{W_{cm} \cdot f_{px}}{w_{px}}
-\]
+distance_cm = (known_width_cm * focal_length_px) / bbox_width_px
+
 
 Where:
-- \( W_{cm} \) = known real-world target width in cm (`KNOWN_TARGET_WIDTH_CM`)
-- \( f_{px} \) = focal length in pixels (`FOCAL_LENGTH_PX`)
-- \( w_{px} \) = bounding box width in pixels (`bbox_width_px`)
+- `known_width_cm` = real-world width of the target (KNOWN_TARGET_WIDTH_CM)
+- `focal_length_px` = camera focal length in pixel units (FOCAL_LENGTH_PX)
+- `bbox_width_px` = observed bounding box width in pixels
 
-**Interpretation:**  
-If the bounding box appears **larger** (bigger \( w_{px} \)), the target is **closer** (smaller distance).  
-If the bounding box appears **smaller**, the target is **farther**.
+Interpretation:
+- Larger bounding box → target is closer
+- Smaller bounding box → target is farther
 
 ---
 
-## Calibration (Estimating \( f_{px} \))
+## Calibration (Estimating Focal Length in Pixels)
 
-Because camera focal length in **pixel units** depends on resolution and camera intrinsics, we estimate
-\( f_{px} \) once using a simple one-point calibration:
+Because focal length in pixel units depends on camera intrinsics and resolution,
+it is estimated once using a known-distance calibration.
 
-\[
-f_{px} = \frac{w_{px} \cdot D_{cm}}{W_{cm}}
-\]
+focal_length_px = (bbox_width_px * calib_distance_cm) / known_width_cm
 
 Where:
-- \( D_{cm} \) = known calibration distance (`CALIB_DISTANCE_CM`)
-- \( w_{px} \) = observed bounding box width at that distance
-- \( W_{cm} \) = known target width
+- `calib_distance_cm` = known distance during calibration (CALIB_DISTANCE_CM)
+- `bbox_width_px` = bounding box width measured at that distance
+- `known_width_cm` = real-world target width
+
+---
 
 ### Practical Calibration Procedure
-1. Place the target at a known distance (ex: **50 cm**).
-2. Run tracking and measure `bbox_width_px`.
+
+1. Place the target at a known distance (e.g. 50 cm).
+2. Run the tracker and measure `bbox_width_px`.
 3. Call `calibrate(bbox_width_px)` once.
-4. Save the resulting `FOCAL_LENGTH_PX` into your config for repeatable runs.
+4. Store the resulting `FOCAL_LENGTH_PX` in the config for repeatable runs.
+
+---
 
 ### Notes / Assumptions
-- This assumes the target’s effective width is consistent and roughly planar to the camera.
-- Changing camera resolution changes the pixel focal length; recalibrate if you change resolution.
+
+- Assumes the target’s effective width is consistent and roughly planar to the camera.
+- Changing camera resolution changes pixel focal length.
+- Recalibrate if camera resolution or lens changes.
+
+---
+
+## Distance Estimation (Runtime)
+
+Once calibrated, distance is computed every frame using the pinhole model:
+
+raw_distance_cm = (known_width_cm * focal_length_px) / bbox_width_px
+
+
+If focal length is unknown or `bbox_width_px <= 0`, the estimator returns `None`
+to avoid invalid results.
 
 ---
 
 ## Smoothing (Low-Pass Filter)
 
-Raw distance estimates fluctuate because detection output fluctuates (lighting, occlusion, bounding box jitter).
-To stabilize it in real time, we apply exponential smoothing:
+Raw distance estimates fluctuate due to detection noise (lighting, occlusion,
+bounding box jitter). To stabilize the output, exponential smoothing is applied.
 
-\[
-\hat{d}_t = (1-\alpha)\hat{d}_{t-1} + \alpha d_t
-\]
+smoothed_distance =
+(1 - alpha) * previous_distance + alpha * current_distance
+
 
 Where:
-- \( d_t \) = raw distance estimate at time \( t \)
-- \( \hat{d}_t \) = smoothed distance estimate
-- \( \alpha \) = smoothing factor (`DIST_SMOOTH_ALPHA`)
-
-**Behavior:**
-- Lower \( \alpha \) (e.g., 0.10) → smoother but slower response
-- Higher \( \alpha \) (e.g., 0.40) → faster response but noisier
+- `alpha` = smoothing factor (DIST_SMOOTH_ALPHA)
+- Lower alpha → smoother but slower response
+- Higher alpha → faster response but noisier
 
 Implementation detail:
-- On the first valid measurement, the smoothed estimate is initialized directly to that value.
-
----
-
-## Failure Conditions / Guardrails
-
-The estimator returns `None` if:
-- `FOCAL_LENGTH_PX` is not known (not calibrated and not provided)
-- `bbox_width_px <= 0`
-
-This prevents divide-by-zero and prevents displaying meaningless distance values.
+- On the first valid estimate, the smoothed value is initialized directly.
 
 ---
 
 ## Configuration Reference
 
-These are the config keys used (defaults shown):
-
-| Parameter | Config Key | Default | Meaning |
-|----------|------------|---------|--------|
-| Target width (cm) | `KNOWN_TARGET_WIDTH_CM` | 16.0 | Real-world width assumption |
-| Calibration distance (cm) | `CALIB_DISTANCE_CM` | 50.0 | Known distance used to compute focal length |
-| Focal length (px) | `FOCAL_LENGTH_PX` | None | Pixel focal length; computed via calibration |
-| Smoothing alpha | `DIST_SMOOTH_ALPHA` | 0.25 | Exponential smoothing strength |
+| Parameter | Config Key | Default | Description |
+|---------|-----------|---------|-------------|
+| Target width (cm) | KNOWN_TARGET_WIDTH_CM | 16.0 | Assumed real-world target width |
+| Calibration distance (cm) | CALIB_DISTANCE_CM | 50.0 | Known distance for calibration |
+| Focal length (px) | FOCAL_LENGTH_PX | None | Computed once via calibration |
+| Smoothing factor | DIST_SMOOTH_ALPHA | 0.25 | Exponential smoothing strength |
 
 ---
 
-## Implementation Snippet (for reference)
+## Failure Conditions
 
-The estimator follows this structure:
+The estimator returns `None` when:
+- Focal length has not been calibrated
+- Bounding box width is zero or invalid
 
-- `calibrate(bbox_width_px)` computes and stores `focal_px`
-- `estimate_cm(bbox_width_px)` returns a smoothed distance estimate
-
-If you want deterministic runs, calibrate once, then store `FOCAL_LENGTH_PX` in config.
-
----
-
-## Limitations (Important)
-
-This method is intentionally simple and fast, but it has limitations:
-
-- **Assumed target width:** distance accuracy depends on how well `KNOWN_TARGET_WIDTH_CM`
-  matches the true target width in the scene.
-- **Perspective effects:** if the target rotates (shoulders angled), apparent width shrinks,
-  which looks like “farther away.”
-- **Bounding box instability:** detection jitter directly affects distance jitter.
-- **Monocular ambiguity:** depth from a single camera is inherently approximate.
-
-Despite these limitations, it provides a useful real-time estimate suitable for display,
-basic behavior logic, or coarse distance-aware control.
+This prevents divide-by-zero and meaningless distance values.
 
 ---
 
-## Suggested Future Improvements
+## Limitations
 
-- Use height-based estimation (more stable for upright people)
-- Use a tracked keypoint distance (e.g., shoulder keypoints) instead of bbox width
-- Apply a Kalman filter for smoother prediction
-- Calibrate using multiple points (distance vs bbox size curve)
+- Distance accuracy depends on the correctness of `known_width_cm`
+- Bounding box width changes with target orientation (e.g. rotation)
+- Monocular depth estimation is inherently approximate
+- Not suitable for precise ranging or safety-critical decisions
+
+Despite these limitations, the estimator provides a lightweight and
+real-time distance approximation suitable for visualization and
+coarse behavior logic.
+
+---
+
+## Future Improvements
+
+- Height-based estimation (more stable for upright people)
+- Keypoint-based distance instead of bounding box width
+- Kalman filtering for predictive smoothing
+- Multi-point calibration curve
