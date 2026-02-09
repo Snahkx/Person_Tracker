@@ -1,133 +1,93 @@
 # Real-Time Vision-Based Person Tracking with Pan–Tilt Control
 
-A Raspberry Pi–based computer vision system that detects and tracks a human target
-in real time and drives a two-axis pan–tilt servo platform to maintain target centering.
+This project is a hands-on exploration of real-time computer vision,
+embedded control, and mechanical design. The system detects a human target
+in a camera feed and physically reorients the camera using a pan–tilt
+mechanism to keep the target centered.
 
-This project integrates computer vision, embedded control, and custom mechanical
-design into a closed-loop tracking system intended as a compact robotics platform
-for experimentation and learning.
-
----
-
-## Overview
-
-The goal of this project was to design and implement an end-to-end tracking system
-capable of detecting a person in a camera feed and physically reorienting the camera
-to keep the target centered. The system processes video frames on a Raspberry Pi,
-estimates positional error relative to the image center, and converts that error
-into servo commands that actuate a pan–tilt mechanism.
-
-The software is modular, configuration-driven, and designed to degrade gracefully
-in the absence of hardware dependencies, allowing development and testing to proceed
-without constant access to physical components.
+It was built as an end-to-end system: from camera input, through control
+logic, all the way to custom hardware.
 
 ---
 
-## System Architecture
+## Why This Project Exists
 
-The system is composed of three primary subsystems:
+I wanted to build something that closed the loop between perception and
+physical motion. Rather than stopping at detection on a screen, this
+project forces the software to deal with the messiness of real hardware:
+noise, latency, jitter, and failure modes.
 
-### 1. Vision Pipeline
-- Camera capture and frame preprocessing
-- Target detection (person / face / colour modes)
-- Bounding box extraction and target selection
-- Pixel-space error computation relative to frame center
-
-### 2. Control Layer
-- Error-to-motion conversion
-- Deadband logic to suppress jitter near the target center
-- Rate limiting and smoothing to prevent oscillation
-- Servo pulse-width generation via pigpio
-
-### 3. Hardware Platform
-- Two-axis pan–tilt mechanism driven by hobby servos
-- Camera rigidly mounted to maintain optical alignment
-- Raspberry Pi acting as both compute and control unit
-
-The architecture cleanly separates perception, control, and hardware concerns,
-allowing individual subsystems to be modified or replaced with minimal impact
-on the rest of the system.
+The goal was not perfection, but understanding.
 
 ---
 
-## Key Features
+## What the System Does
 
-- Real-time person and face tracking using OpenCV
-- Closed-loop pan–tilt servo control based on image-space error
-- Deadband-based jitter suppression near the target center
-- Modular tracking modes (person, face, colour)
-- Centralized configuration for tuning control and detection parameters
-- Hardware-safe initialization and shutdown behavior
-- Graceful failure handling when hardware dependencies are unavailable
+- Captures live video on a Raspberry Pi
+- Detects and tracks a human target
+- Computes image-space error relative to the frame center
+- Converts that error into pan–tilt servo commands
+- Physically moves the camera to follow the target
 
----
-
-## Engineering Challenges & Solutions
-
-### Servo Jitter Near Target Center
-Small detection noise caused rapid micro-adjustments when the target was near the
-center of the frame. This was mitigated by introducing a configurable deadband,
-preventing corrective motion unless the error exceeded a minimum threshold.
-
-### Noisy Detections Under Variable Conditions
-Detection output fluctuated due to lighting changes and partial occlusions.
-Minimum-area filtering and target reacquisition logic were used to stabilize tracking
-and reduce false corrections.
-
-### Hardware Dependency Management
-The pigpio daemon is required for servo control. Runtime checks were added to detect
-daemon availability and prevent unsafe behavior when the dependency is missing,
-allowing the system to run in a vision-only mode.
-
-### Performance Constraints on Raspberry Pi
-To maintain real-time responsiveness, resolution, processing frequency, and pipeline
-complexity were tuned to balance detection accuracy and frame rate.
+All of this runs in real time on embedded hardware.
 
 ---
 
-## Validation & Testing
+## System Structure
 
-The system was validated through live testing on physical Raspberry Pi hardware:
+The system is organized into three layers:
+- Vision (what do I see?)
+- Control (how should I move?)
+- Hardware (how do I move safely?)
 
-- Verified real-time target detection and continuous tracking
-- Confirmed stable pan–tilt motion under typical indoor conditions
-- Observed reduced oscillation near the image center due to deadband control
-- Confirmed safe behavior during target loss and reacquisition
+Each layer is deliberately kept simple and isolated.
+
+For details, see:
+- [`docs/architecture.md`](docs/architecture.md)
+- [`docs/design-decisions.md`](docs/design-decisions.md)
 
 ---
 
-## Hardware Design
+## Hardware
 
-The camera is mounted on a custom-designed pan–tilt platform modeled in SolidWorks.
-The mechanical design prioritizes stiffness, alignment, and serviceability while
-remaining compact and easy to manufacture via 3D printing.
+The camera is mounted on a custom-designed pan–tilt platform modeled in
+SolidWorks. The design focuses on alignment, stiffness, and ease of
+iteration using 3D-printed components.
 
 📁 Hardware CAD, drawings, and BOM: [`hardware/`](hardware/)
 
 ---
 
-## Project Status
+## Validation
 
-Demo media and annotated screenshots will be added once hardware access is available.
-The system architecture, control logic, and mechanical design are complete and documented.
-
----
-
-## Future Work
-
-- Kalman filtering for smoother tracking and prediction
-- Multi-target detection and selection logic
-- ROS2 node integration for broader robotics use
-- Edge acceleration using dedicated vision hardware (TPU / NPU)
+The system was tested on physical Raspberry Pi hardware with a servo-driven
+pan–tilt platform. Testing focused on:
+- Stability near the image center
+- Smooth target reacquisition
+- Safe behavior during target loss
 
 ---
 
-## Repo Tour
+## Current State
 
-- `src/vision/` – camera handling and detection pipeline  
-- `src/servo/` – pan–tilt control and safety logic  
-- `src/ui/` – overlay rendering and diagnostics  
-- `hardware/` – CAD, drawings, and bill of materials  
-- `docs/` – engineering report and design documentation  
+The core system is complete and documented. Demo media and annotated
+screenshots will be added once hardware access is available.
+
+---
+
+## Future Directions
+
+This project is intentionally extensible. Possible next steps include:
+- Predictive filtering for smoother motion
+- Multi-target tracking
+- ROS2 integration
+- Hardware acceleration for vision processing
+
+---
+
+## Repo Guide
+
+- `src/` – vision, control, and runtime code  
+- `hardware/` – CAD, drawings, and BOM  
+- `docs/` – architecture and design documentation  
 - `demo/` – demo media (to be added)
-
