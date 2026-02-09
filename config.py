@@ -4,7 +4,7 @@ import numpy as np
 # ----------------------------
 # Camera
 # ----------------------------
-PREVIEW_SIZE = (800, 600)  # default; override in config_local.py if you want
+PREVIEW_SIZE = (1280, 720)  # default; override in config_local.py if you want
 
 # ----------------------------
 # Colour tracking (kept for later)
