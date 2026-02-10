@@ -88,11 +88,4 @@ FACE_CASCADE_FRONTAL = "/usr/share/opencv4/haarcascades/haarcascade_frontalface_
 FACE_CASCADE_PROFILE = "/usr/share/opencv4/haarcascades/haarcascade_profileface.xml"
 
 
-# ==========================================================
-# Local overrides (NOT tracked by git)
-# Put your machine-specific settings in config_local.py
-# ==========================================================
-try:
-    from config_local import *  # noqa
-except ImportError:
-    pass
+
