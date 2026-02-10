@@ -5,6 +5,7 @@ This hardware system supports a camera-based real-time tracking pipeline by prov
 a two-axis pan–tilt mechanism driven by SG90 servos. The design prioritizes stability,
 repeatability, and ease of integration with Raspberry Pi-based control software.
 
+
 ## Components
 - 2× SG90 servos (pan + tilt)
 - Raspberry Pi camera module 
@@ -29,7 +30,9 @@ is aligned to minimize offset between optical axis and rotation axes.
 - Fastener accessibility for rapid iteration + DFA
 
 ## Assembly
-See exploded view and BOM for assembly sequence and required hardware.
+See exploded view for assembly below, schematics in other files.
+
+![alt text](image.png)
 
 ## Future Improvements
 - Bearing-supported pan axis
