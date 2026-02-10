@@ -10,6 +10,8 @@ logic, all the way to custom hardware.
 
 ---
 
+Made in Collaboration with Ayrton Wong, AyrtonW312 on Github.
+
 ## Why This Project Exists
 
 I wanted to build something that closed the loop between perception and
