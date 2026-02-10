@@ -54,7 +54,7 @@ The camera is mounted on a custom-designed pan–tilt platform modeled in
 SolidWorks. The design focuses on alignment, stiffness, and ease of
 iteration using 3D-printed components.
 
-📁 Hardware CAD, drawings, and BOM: [`hardware/`](hardware/)
+📁 Hardware files, drawings, and assembly: [`hardware/`](hardware/)
 
 ---
 
@@ -83,13 +83,13 @@ This project is intentionally extensible. Possible next steps include:
 - ROS2 integration
 - Hardware acceleration for vision processing
 
-https://ibrahimmansur4.medium.com integrating-opencv-with-ros2-a-comprehensive-guide-to-computer-vision-in-robotics-66b97fa2de92
+https://ibrahimmansur4.medium.com/integrating-opencv-with-ros2-a-comprehensive-guide-to-computer-vision-in-robotics-66b97fa2de92
 
 ---
 
 ## Repo Guide
 
 - `src/` – vision, control, and runtime code  
-- `hardware/` – CAD, drawings, and BOM  
+- `hardware/` – Files, drawings, and Assembly.
 - `docs/` – architecture and design documentation  
 - `demo/` – demo media (to be added)
